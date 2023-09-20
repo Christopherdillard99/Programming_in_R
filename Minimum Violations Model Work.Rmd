@@ -1,0 +1,172 @@
+---
+title: "Minimum Violations Model"
+author: "Christopher Dillard"
+date: "2023-06-14"
+output: word_document
+---
+
+Preliminary work and Given Code
+
+```{r, message=FALSE}
+library(tidyverse)
+library(ompr)
+library(ROI)
+library(ROI.plugin.glpk)
+library(ompr.roi)
+```
+
+```{r}
+#parameters
+n = 3 #total number of teams
+g = 3 #total number of games, technically non-tied, but we are not considering ties
+M = 1000
+S = 10
+```
+
+```{r}
+#Dataframe with results of games played
+games = data.frame(winner=c(1,1,2),
+loser=c(2,3,3))
+games
+```
+
+```{r}
+#Construct Optimization Model to Minimize the number of violations (ie when a team is ranked higher than another that it lost to)
+model = MIPModel() %>%
+add_variable(v[i], i = 1:g, type = "binary") %>% #violation variable, v, is binary [0,1]
+add_variable(t[i], i = 1:n, type = "continuous") %>% #team rating variable, t, is continuous
+set_objective(sum_expr(v[i], i = 1:g),"min") %>% #create objective function
+add_constraint(t[games[i,1]] - t[games[i,2]] + M*v[i] >= S, i = 1:g) %>%
+add_constraint(t[i] >= 0, i = 1:n) #all team ratings greater than or equal to zero
+```
+
+```{r}
+#Solve Model
+result = solve_model(model, with_ROI(solver = "glpk", verbose = TRUE))
+```
+
+```{r}
+#team ratings from solution to the optimization model
+result %>% get_solution(t[i])
+```
+
+```{r}
+#number of violations
+result %>% get_solution(v[i]) %>% summarise(sum = sum(value))
+```
+
+```{r}
+#show the violations
+result %>% get_solution(v[i])
+```
+
+```{r}
+#parameters adjustment for larger model
+n = 7 #total number of teams
+g = 21 #total number of games, technically non-tied, but we are not considering ties
+M = 1000
+S = 10
+```
+
+```{r,message=FALSE}
+games = as.data.frame(read_csv("sec_west.csv")) #must be a data frame, not a tibble
+```
+
+```{r}
+#games
+```
+
+```{r}
+#New model name, change reference games to 5 and 6 to reflect columns in data frame where winners and losers are shown
+model2 = MIPModel() %>%
+add_variable(v[i], i = 1:g, type = "binary") %>% #violation variable, v, is binary [0,1]
+add_variable(t[i], i = 1:n, type = "continuous") %>%
+set_objective(sum_expr(v[i], i = 1:g),"min") %>% #create objective function
+add_constraint(t[games[i,5]] - t[games[i,6]] + M*v[i] >= S, i = 1:g) %>%
+add_constraint(t[i] >= 0, i = 1:n) #all team ratings greater than or equal to zero
+```
+
+```{r}
+#Solve new model
+result2 = solve_model(model2, with_ROI(solver = "glpk", verbose = TRUE))
+```
+```{r}
+#team ratings
+result2 %>% get_solution(t[i])
+```
+
+```{r}
+#number of violations
+result2 %>% get_solution(v[i]) %>% summarise(sum = sum(value))
+```
+
+```{r}
+#show the violations
+result2 %>% get_solution(v[i])
+```
+Explanation of violation? The only violation was in game 21. In this game (look at the 21st row in the “games” data frame), Texas
+A&M defeated LSU 74-72. However, LSU (Team 4 in the dataset) finished with a higher rating (50) than
+Texas A&M (Team 7, rating of 20)
+
+
+## Task 1:
+
+Develop a Minimum Violations Ranking for the Alliance of American Football (AAF).
+The AAF was a Spring football league in the United States that ceased operation before completing its only
+season in 2019. Each team played eight games of a ten game schedule before the league folded (Rest in peace
+my beloved Birmingham Iron). The Orlando Apollos (coached by Steve Spurrier) were clearly the best team
+in the league with a record of seven wins and one loss at the time that the league ended.
+
+```{r}
+#Read-in the “aaf.csv” file that contains game data for the league.
+games2 = as.data.frame(read_csv("aaf.csv"))
+```
+```{r}
+#New Parameters
+#parameters
+n = 8 #total number of teams
+g = 32 #total number of games, technically non-tied, but we are not considering ties
+M = 1000
+S = 10
+
+#New model name, change reference games to 5 and 6 to reflect columns in data frame where winners and losers are shown
+model3 = MIPModel() %>%
+add_variable(v[i], i = 1:g, type = "binary") %>%
+  add_variable(t[i], i = 1:n, type = "continuous") %>%
+  set_objective(sum_expr(v[i], i = 1:g), "min") %>%
+  add_constraint(t[games2[i, 8]] - t[games2[i, 9]] + M * v[i] >= S, i = 1:g) %>%
+  add_constraint(t[i] >= 0, i = 1:n)
+```
+
+```{r}
+#Solve new model
+result3 = solve_model(model3, with_ROI(solver = "glpk", verbose = TRUE))
+```
+```{r}
+#team ratings
+result3 %>% get_solution(t[i])
+```
+
+```{r}
+#number of violations
+result3 %>% get_solution(v[i]) %>% summarise(sum = sum(value))
+```
+
+```{r}
+#show the violations
+result3 %>% get_solution(v[i])
+```
+
+Comment on the rankings. Do they correspond well to the actual rankings at the end of the season (you can
+Google to find the AAF standings)?
+
+From our model, we can see that the rankings are as follows: Arizona Hotshots (1), Orlando Apollos (5), San Antonio Commanders (7), Birmingham Iron (3), San Diego Fleet (8), Atlanta Legends (2) & Salt Lakes Stallions (6) at a tie, and lastly Memphis Express (4). This order falls pretty well in line with the actual results from the season from [Livesport.com](https://www.livesport.com/football/usa/aaf/#/GOrngHPh/table/overall). 
+
+One key difference, however, is when it comes to who reigned overall champion and which teams placed last. The Orlando Apollos finished the season with a win-loss ratio of 7-1, far better than any of the other teams.That being said, running the model put the Arizona Hotshots on top, who in reality finished the season 5-3. Interestingly enough, they share this ratio with the San Antonio Commanders and Birmingham Iron, who placed 3rd and 4th in our model, respectively. The Atlanta Legends and the Salt Lake Stallions came to a tie in our model, but they performed slightly differently during the season with the Stallions faring better at 3-5, compared to the Legends ratio of 2-6. Similarly, Memphis Express was predicted to come last in the model but in reality performed just as poor as the Legends in terms of games won, with a total of 2/8. So, although the rankings produced in the model differ from what actually occurred during the season, there are a lot of similarities that can be drawn, with relatively slight differences where the model does not match actual season performance. 
+
+https://www.livesport.com/football/usa/aaf/#/GOrngHPh/table/overall
+
+
+
+
+
