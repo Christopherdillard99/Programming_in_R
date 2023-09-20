@@ -1,0 +1,116 @@
+---
+title: "Runs Created"
+author: "Christopher Dillard"
+date: "2023-05-25"
+output: word_document
+---
+
+```{r}
+library(tidyverse)
+library(esquisse)
+library(Lahman)
+```
+
+```{r}
+teams = Lahman::Teams
+```
+
+### Task 1:
+
+```{r}
+teams = teams %>%
+  filter(yearID >= 1998)
+```
+
+After filtering for years since 1998, only 750 rows remain in the "teams" data frame. Each row corresponds to a team's data for each year (season).
+
+### Task 2:
+
+```{r}
+mean(teams$R)
+```
+```{r}
+teams %>%
+  slice_max(R)
+teams %>%
+  slice_min(R)
+```
+
+1. The mean number of runs in the data set is 724 (rounding down under the assumption that an incomplete run does not count).
+
+2. The team with the most runs was Cleveland Indians during the 1999 season. On the other hand, the Pittsburgh Pirates scored the least runs in the 2020 season.
+
+
+### Task 3:
+
+```{r}
+ggplot(teams,aes(yearID,R),smooth)+
+  geom_point() +
+  geom_smooth(method="lm")+
+  labs(x="Year",y="R (Number of Runs)")+
+  ggtitle("Number of Runs Since 1998")
+```
+
+It appears that the number of runs has generally decreased since 1998. The downward slope of the regression line (in blue) shows this, although it is evident that the values corresponding to 2020 are all significant lower than the other years, as this particular season was affected by the Covid-19 pandemic.
+
+
+### Task 4:
+
+```{r}
+teams = teams %>% mutate(X1B = H - X2B - X3B - HR,
+TB = X1B + 2*X2B + 3*X3B + 4*HR)
+
+teams = teams %>% mutate(RC = ((H+BB)*TB)/(AB+BB))
+```
+
+```{r}
+ggplot(teams,aes(R,RC))+
+  geom_point()+
+  geom_smooth(method="lm")
+```
+
+This graphs depicts a strong positive correlation between runs created and actual runs, with relatively low dispersion of points around the regression line, which has a consistently straight, positive slope. 
+
+### Task 5:
+
+```{r}
+teams %>%
+  slice_max(RC)
+teams %>%
+  slice_min(RC)
+```
+
+The team with the most runs created was the Boston Red Sox in 2003. The lowest runs created belongs to the Pittsburgh Pirates in 2020. These are NOT the same teams from Task 2 that had the most runs.
+
+### Task 6:
+
+```{r}
+model1 = lm(R ~ RC, teams)
+summary(model1)
+```
+
+R = 38.826 + 0.945*RC
+
+RC is a significant predictor of R if we only look at the p-value, which is extremely small.
+
+The R-squared value of our model is 0.9537. This implies that the model is very reliable, in that the Runs Created (RC) is a very predictor of runs.
+
+
+### Task 7:
+
+```{r}
+teams = teams %>% mutate(Diff = RC-R)
+```
+
+
+```{r}
+teams %>%
+  slice_max(Diff)
+teams %>%
+  slice_min(Diff)
+```
+
+This new column measures how different the Runs Created value (or the potential for Runs to take place created by the hitter, derived from various other metrics) were from the actual recorded runs. In other words, taking the difference could provide insight into how much hitters' actions contributed to actual points. A positive difference value would imply that the hitters contributed more (or are just inherently better at batting) to the number of runs, while a negative difference would imply that hitters contributed less to the number of runs, or perhaps this team is worse at batting. The Chicago Cubs have the largest diff at 84.894. The Tampa Bay Rays have the smallest diff at -112.187. Ultimately, the difference measures the team's offensive contribution to total runs in terms of how well they hit the ball.
+
+
+
