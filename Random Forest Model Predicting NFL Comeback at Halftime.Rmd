@@ -1,0 +1,527 @@
+---
+title: "Final Project Practice Work"
+author: "Christopher Dillard"
+date: "2023-07-02"
+output: word_document
+---
+
+Can a random forest model accurately forecast the likelihood of a team making a comeback and winning a game when trailing by a certain margin at halftime?
+
+## Step 1: Data Reading-In and Tidying:
+
+```{r,results='hide', message=FALSE, warning=FALSE}
+library(tidyverse)
+```
+
+### Download the play by play data from github and create a new data frame:
+
+This is from Module 4: Assignment 2:
+pbp2018 = readRDS(gzcon(url("https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2018.rdsLinks to an external site.?raw=trueLinks to an external site.")))
+pbp2019 = readRDS(gzcon(url("https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2019.rds?raw=true"Links to an external site.)))
+
+```{r}
+pbp2018 = readRDS(gzcon(url("https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2018.rds?raw=true")))
+pbp2019 = readRDS(gzcon(url("https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2019.rds?raw=true")))
+pbp2020 = readRDS(gzcon(url("https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2020.rds?raw=true")))
+pbp2021 = readRDS(gzcon(url("https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2021.rds?raw=true")))
+pbp2022 = readRDS(gzcon(url("https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_2022.rds?raw=true")))
+```
+
+### Merge the 5 datasets into one and then remove them from the environment:
+
+```{r}
+pbpfull = bind_rows(pbp2018,pbp2019,pbp2020,pbp2021,pbp2022)
+```
+
+```{r}
+rm(pbp2018,pbp2019,pbp2020,pbp2021,pbp2022)
+```
+
+### Clean the Data Frame to only contain useful data for the equation at hand: 
+
+In this preprocessing phase, I am concerned about variable selection, missing value, and general descriptive analytics to be able to use a Random Forest later. 
+
+Once I narrow down the variables to the most relevant ones, I need to further clean the data to handle NA's, either by deletion or imputing a new value if it makes sense. For categorical data that would involve randomly assigning a label to each NA, which I believe would completely undermine the value of play-by-play data. 
+
+The inherent nature of how Random Forest handle missing data will prove to be a challenge with this particular dataset, but by looking at the right variables it can still be useful in making predictions.
+
+### First we look at structure and Variables:
+
+These are the variables descriptions: https://nflreadr.nflverse.com/articles/dictionary_pbp.html
+
+```{r}
+#str(pbpfull)
+#summary(pbpfull) a simple summary function is not exactly easy to read with 372 different variables.
+#So, this next code will simplify this process and help us identify NAs:
+
+```
+
+if we find instances where a team does make a comeback, we can look at the desc (description) in the pbpfull d.f. to see exactly what happened. 
+
+```{r}
+pbp_cleaned = pbpfull %>%
+  mutate(Half_Time = if_else(qtr == 2 & rank(-quarter_seconds_remaining, ties.method = "min") == 1, 1, 0))%>%
+  select(away_team,home_team,game_id, yardline_100,total_home_score,total_away_score, quarter_seconds_remaining,game_seconds_remaining,game_half,ydstogo,ydsnet,play_type, qtr,home_score,away_score, location, total,spread_line, total_line, roof, surface, temp, wind, pass, rush,home_timeouts_remaining,away_timeouts_remaining, season, series,home_wp,away_wp, ep, desc,Half_Time)
+```
+
+Now, we need to evaluate our data in terms of the actual game being played, as determined by the game_id variable.
+
+
+
+```{r}
+colSums(is.na(pbp_cleaned))
+#str(pbp_cleaned)
+#summary(pbp_cleaned)
+```
+
+There are 106 rows of missing data for the three variables related to seconds remaining, in addition to the "time" variable.
+
+Knowing the play type is crucial to understand the winning chance at a specific play, so with only 51 rows of missing data for the play_type, I cant complete row wise deletion here with losing too much data. 
+
+Temp and Wind both have 124,494 instances of missing data, which has to do with the games played indoors. To make up for these missing values, we will have to take the typical values for both (indoor temp is usually 70-75 and wind speed would be 0) and impute these values.
+
+One odd thing about this dataset is that plays that occurred in overtime were recorded to happen during the "5th quarter" (ie. qtr ==5), as shown below:
+
+```{r}
+unique(pbp_cleaned$qtr)
+```
+
+This could lead to some creative coding later on but I'll tackle that when the time comes.
+
+### Accounting for NAs in pbp_cleaned:
+
+```{r}
+
+# Temperature and Wind
+
+pbp_cleaned = pbp_cleaned %>%
+ mutate(wind = ifelse(is.na(wind),0,wind),temp=ifelse(is.na(temp),70,temp),roof=if_else(is.na(roof), "Unspecified", roof))
+
+# Row-wise deletion for the missing play type:
+
+pbp_cleaned = pbp_cleaned %>% na.omit(c("play_type","yardline_100","ydsnet"))
+
+```
+
+Checking again to see if I have successfully eliminated all missing data:
+
+```{r}
+colSums(is.na(pbp_cleaned))
+```
+
+I'm good to move onto the next step now
+
+### How many games are represented in the data set?
+
+```{r}
+length(unique(pbp_cleaned$game_id))
+```
+
+This tells me that there are 1372 games in the pbp_clean dataset over the course of 5 years. 1372/5 = 274.4 which is close enough to the true NFL season number of games at 272 (from 32 teams playing 17 games each). So, the previous row-wise deletion still left me with a lot of valuable data.
+
+
+Now, how many rows does each game have? (number of rows = number of plays in the dataset).
+
+```{r}
+n_occur = data.frame(table(pbp_cleaned$game_id))
+frequencies_perGame = n_occur[n_occur$Freq > 1,]
+print(head(frequencies_perGame, 10))
+
+
+```
+
+The game with the lowest number of plays in the dataset set was 2019_07_SF_WAS at 128, while the highest number was 225 belonging to 2019_16_CIN_MIA. There is a considerable amount of variability between the number of plays for each game.
+
+Speaking of actual ties in final scores, I need to check for those by looking at games that went into overtimes and their current play scores were the same of their team scores columns.
+
+So, first things first: how many games went into overtime?
+
+```{r}
+# A quick count of the games that went into overtime:
+
+Overtime_Plays = pbp_cleaned[pbp_cleaned$qtr == 5, ]
+
+OvertimeGames_Count =  length(unique(Overtime_Plays$game_id))
+
+OvertimeGames_Count
+```
+
+No how many of those games ended in a tie, despite going into overtime?
+
+```{r}
+Overtime_Plays = pbp_cleaned[pbp_cleaned$qtr == 5, ]
+
+
+ForeverTies = Overtime_Plays[Overtime_Plays$home_score == Overtime_Plays$away_score & Overtime_Plays$total_home_score == Overtime_Plays$total_away_score, ]
+
+length(unique(ForeverTies$game_id))
+unique(ForeverTies$game_id)
+
+```
+
+I would love to create a model that would better handle multinomial response variable, so I could add a "Forever Tied" in the new variable "Made_a_Comeback", but with a Random Forest model I should stick to what I know how to do here and eliminate the seven games that resulted in a tie since, after all, its only 7 of the 1372 games we started with.
+
+```{r}
+pbp_cleaned = pbp_cleaned %>%
+  filter(!(game_id %in% c("2018_01_PIT_CLE", "2018_02_MIN_GB", "2019_01_DET_ARI", "2020_03_CIN_PHI", "2021_10_DET_PIT", "2022_01_IND_HOU","2022_13_WAS_NYG")))
+```
+
+Now, a new head count of unique game_ids to make sure everything checks out:
+
+```{r}
+length(unique(pbp_cleaned$game_id))
+```
+
+### Creating a new variable called "Made_a_Comeback to measure whether the team losing at halftime ends up winning the game:
+
+1. I need to look at two variables to determine which play contains our half-time score. The running totals are in the qtr (quarter) and quarter_seconds_remaining variables. So, qtr must be == 2, but not all of the last plays in the second quarter happened where quarter_seconds_remaining == 0. So, I need to take the rows with the value closest to zero here. 
+
+2. To determine which team is losing at half-time, I need to compares the scores from the the row found in the previous step. The current play scores are in the total_home_score and total_away_score (which are a bit misleading in the naming if you ask me, but I digress). 
+
+3. The second group of variables we need to compare are home_score and away_score to see if the losing team ultimately won. One thing to keep in mind is that this dataset has "five" quarters, with qtr == 5 corresponding to the plays that occurred during overtime.
+
+We can later create a table to see which teams were playing and make some grpahs.
+
+
+```{r}
+pbp_cleaned = pbp_cleaned %>%
+  group_by(game_id) %>%
+  mutate(Half_Time = if_else(qtr == 2 & rank(-quarter_seconds_remaining, ties.method = "min") == 1, 1, 0))
+```
+
+
+Made_a_Comeback will be either be "Yes" or "No" thank to a handy dandy ifelse statement. The trick here is to make sure sure that if the losing team makes a comeback, then the "Yes" result under the new "Made_a_Comeback" variable is correctly labeled for all rows that shares the same game_id:
+
+
+
+```{r}
+pbp_cleaned = pbp_cleaned %>%
+  group_by(game_id) %>%
+  mutate(
+    Made_a_Comeback = ifelse(
+      Half_Time == 1,
+      ifelse(
+        (total_home_score == max(total_home_score[Half_Time == 1]) & total_home_score < total_away_score & home_score > away_score) |
+        (total_away_score == max(total_away_score[Half_Time == 1]) & total_away_score < total_home_score & away_score > home_score),
+        "Yes",
+        "No"
+      ),
+      NA
+    ),
+    Made_a_Comeback = na.omit(Made_a_Comeback)[1]
+  )
+```
+
+
+Here is a new subsetted object that contains all of the Comebacks incase I need to make a neat graph latter:
+
+```{r}
+Comebacks = subset(
+  pbp_cleaned,
+  Made_a_Comeback == "Yes" & Half_Time == 1,
+  select = c(
+    game_id,
+    total_home_score,
+    total_away_score,
+    home_score,
+    away_score
+  )
+)
+
+head(Comebacks)
+
+n_distinct(Comebacks$game_id)
+```
+
+
+Of the 1370 games in the pbp_cleaned dataset, there were 340 instances of comebacks. That accounts for roughly 25% of all games here. 
+
+This next chunk of code is to ensure that all rows that share the same game_id, ended up with the same "Yes" value, as opposed to just the Half_Time row. 
+
+```{r}
+pbp_cleaned %>%
+  filter(game_id == "2018_01_ATL_PHI")%>%
+  head()
+```
+
+### Point differential at half-time (from the team losing at half-time's perspective)
+
+
+This code below creates a new variable, htptdif (half time point difference) which will then be used to group team that made a comeback by how much they were losing at Halftime.
+In the same code chunk, I can create the last variable that needed to be created - grouping the point differentials at Half Time into <5, 6-10, 11-15, 16-20, 21-25, and >= 26. There were weirdly cases where multiple halftimes were recorded for a few games so this code help fix that issue. 
+
+
+```{r}
+pbp_cleaned <- pbp_cleaned %>%
+  group_by(game_id) %>%
+  mutate(htptdif = ifelse(
+    (total_home_score == max(total_home_score[Half_Time == 1]) & total_home_score < total_away_score),
+    total_away_score - total_home_score,
+    ifelse(
+      (total_away_score == max(total_away_score[Half_Time == 1]) & total_away_score < total_home_score),
+      total_home_score - total_away_score,
+      0
+    )
+  )) %>%
+  mutate(htptdifgroup = case_when(
+    htptdif == 0 ~ "Tie at HT",
+    htptdif >= 1 & htptdif <= 5 ~ "1-5",
+    htptdif >= 6 & htptdif <= 10 ~ "6-10",
+    htptdif >= 11 & htptdif <= 15 ~ "11-15",
+    htptdif >= 16 & htptdif <= 20 ~ "16-20",
+    htptdif >= 21 & htptdif <= 25 ~ "21-25",
+    htptdif >= 26 ~ ">25",
+    TRUE ~ "Other"
+  ))
+
+```
+
+
+This is a table of all the comebacks, with the score differentials at half-time:
+
+```{r}
+comebacksptdifdata <- subset(pbp_cleaned, Made_a_Comeback == "Yes" & Half_Time == 1)
+
+comebacksptdif <- comebacksptdifdata %>%
+  group_by(htptdifgroup) %>%
+  summarize("Point Differential at Half-Time" = unique(htptdifgroup), Sum = n_distinct(game_id))
+
+print(comebacksptdif)
+```
+
+
+
+
+```{r}
+ggplot(comebacksptdif, aes(x = reorder(htptdifgroup, -Sum), y = Sum, fill = "Comebacks")) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(
+    x = "Point Differential at Half-Time",
+    y = "Number of Comebacks",
+    title = "Number of Comebacks by Point Differential at Half-Time"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+
+
+```{r}
+ggplot(comebacksptdif, aes(x = reorder(htptdifgroup, -Sum), y = Sum, fill = "Comebacks")) +
+  geom_bar(stat = "identity", fill = "#3366CC") +
+  geom_text(aes(label = Sum), vjust = -0.5, color = "Black") +
+  labs(
+    x = "Point Differential at Half-Time",
+    y = "Number of Comebacks",
+    title = "Number of Comebacks by Point Differential at Half-Time"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+
+
+```{r}
+pbp_cleaned %>%
+ filter(!(surface %in% "")) %>%
+ filter(!(htptdifgroup %in% c("Tie at HT", ">25"))) %>%
+ ggplot() +
+  aes(x = Made_a_Comeback) +
+  geom_bar(fill = "#0443B3") +
+  labs(
+    x = "Made a Comeback (No or Yes)",
+    y = "Count",
+    title = "What are the odds of Making a Comeback?",
+    subtitle = "Split by the Point Differential at Half-Time"
+  ) +
+  theme_minimal() +
+  facet_wrap(vars(htptdifgroup))
+```
+
+```{r}
+pbp_cleaned %>%
+  filter(!(surface %in% "")) %>%
+  filter(!(htptdifgroup %in% c("Tie at HT",">25"))) %>%
+  mutate(htptdifgroup = factor(htptdifgroup, levels = c("1-5", "6-10", "11-15", "16-20", "21-25"))) %>%
+  ggplot() +
+  aes(x = Made_a_Comeback) +
+  geom_bar(fill = "#0443B3") +
+  labs(
+    x = "Made a Comeback (No or Yes)",
+    y = "Count",
+    title = "What are the odds of Making a Comeback?",
+    subtitle = "Split by the Point Differential at Half-Time"
+  ) +
+  theme_minimal() +
+  facet_wrap(vars(htptdifgroup))
+```
+
+### Maybe take a sample of the dataset to make it easier to make graphs:
+
+```{r}
+set.seed(123)
+
+# Take a random sample of size n from the dataset
+sample_pbp <- pbp_cleaned[sample(nrow(pbp_cleaned),2000), ]
+```
+
+```{r}
+#esquisser()
+```
+
+```{r}
+pbp_cleaned %>%
+ filter(!(surface %in% "")) %>%
+ filter(!(htptdifgroup %in% c("<Five", ">Twentyfive"))) %>%
+ ggplot() +
+  aes(x = ep, fill = Made_a_Comeback) +
+  geom_histogram(bins = 30L) +
+  scale_fill_manual(
+    values = c(No = "#00CDFF",
+    Yes = "#0222FF")
+  ) +
+  labs(
+    x = "EP (Expected Points)",
+    title = "Expected Points for Each Play and Comebacks",
+    fill = "Made a Comeback"
+  ) +
+  theme_minimal()
+```
+
+### Preliminary Work to ease the computational load on my laptop and select only necessary variables:
+
+```{r}
+library(ggcorrplot)
+library(rcompanion)
+library(car)
+```
+
+```{r}
+library(tidymodels)
+library(glmnet)
+library(usemodels)
+library(e1071)
+library(ROCR)
+library(GGally)
+library(caret)
+library(gridExtra)
+library(vip)
+library(ranger)
+pbp_cleaned_ggcorr = pbp_cleaned %>%
+  dplyr::select(qtr,quarter_seconds_remaining,ydstogo,home_score,away_score,yardline_100)
+ ggcorr(pbp_cleaned_ggcorr, label = "TRUE", label_round = 2) +
+  labs(title = "Correlation Matrix Between to Test For Multicollinearity")
+```
+
+
+As expected here, games_seconds_remaining and qtr are very correlated at -.96, so this will be a tough call but I'll choose qtr over game_seconds_remaining since I'd consider plays to be more geared towards the quarter they occur in, as a deciding factor into how they are decided.
+
+```{r}
+#str(pbp_cleaned)
+```
+
+### Ensuring that the Response variable is a factor and check the order of the levels:
+
+
+```{r}
+pbp_cleaned$Made_a_Comeback = as.factor(pbp_cleaned$Made_a_Comeback)
+levels(pbp_cleaned$Made_a_Comeback)
+```
+
+
+```{r}
+set.seed(123) 
+pbp_split = initial_split(pbp_cleaned, prop = 0.7, strata = Made_a_Comeback) #70% in training
+train = training(pbp_split)
+test = testing(pbp_split)
+```
+
+
+### Setting up the Random Forest Model:
+
+### Takes just about 5 mins to run on my laptop
+
+```{r}
+
+pbp_recipe = recipe(Made_a_Comeback ~ep + htptdif + away_timeouts_remaining + total_home_score + total_away_score + home_timeouts_remaining + qtr + game_half + temp + wind + surface + roof + yardline_100 + htptdifgroup, train) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+rf_model = rand_forest() %>% 
+  set_engine("ranger", importance = "permutation") %>% #added importance metric
+  set_mode("classification")
+
+pbp_wflow = 
+  workflow() %>% 
+  add_model(rf_model) %>% 
+  add_recipe(pbp_recipe)
+
+set.seed(123)
+pbp_fit = fit(pbp_wflow, train)
+```
+
+
+
+Check out random forest details  
+```{r}
+pbp_fit
+```
+
+Predictions  
+```{r}
+predRF = predict(pbp_fit, train)
+head(predRF)
+```
+
+Confusion matrix
+```{r}
+confusionMatrix(predRF$.pred_class, train$Made_a_Comeback, positive = "Yes")
+```
+
+
+Predictions on Test:
+
+
+Predictions on test
+```{r}
+testpredrf = predict(pbp_fit, test)
+head(testpredrf)
+confusionMatrix(testpredrf$.pred_class, test$Made_a_Comeback, 
+                positive = "Yes")
+```
+
+
+
+
+
+
+### Saving model to a file and how to load it:
+
+
+```{r}
+saveRDS(pbp_fit, "pbp_fit.rds")
+```
+
+```{r}
+pbp_fit = readRDS("pbp_fit.rds")
+```
+
+
+### Checking out variable importance:
+
+```{r}
+pbp_fit %>% pull_workflow_fit() %>% vip(geom = "col")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
