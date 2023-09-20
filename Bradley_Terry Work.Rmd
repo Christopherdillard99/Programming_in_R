@@ -1,0 +1,127 @@
+---
+title: "Module 5: Assignment 2 Bradley-Terry"
+author: "Christopher Dillard"
+date: "2023-06-15"
+output: word_document
+---
+
+```{r, message=FALSE}
+library(tidyverse)
+library(BradleyTerry2)
+```
+
+```{r}
+data(icehockey)
+head(icehockey)
+```
+
+Task 1:
+ What do the 0, 0.5, and 1 refer to in the “result” variable?
+ 
+## 0 means that the team lost, 0.5 refers to a tie, and 0 denotes a victory. 
+ 
+Task 2:
+Fit a Bradley-Terry Model to the data using the code below. We’ll call this model “standardBT”.
+Note the warning that appears “non-integer #successes in a binomial glm!” is OK and is related to your
+answer from Task 1.
+
+```{r}
+standardBT = BTm(outcome = result, player1 = visitor, player2 = opponent,
+id = "team", data = icehockey)
+```
+
+```{r}
+summary(standardBT)
+```
+
+Task 3:
+We can extract the team abilities directly from the model with the code below. These ability values
+can then be used to estimate the probability that one team will defeat another. We store the team names
+and abilities in a data frame called “ability”. We also look at the first few rows of the abilities to see what
+they look like.
+
+
+```{r}
+abilities = data.frame(exp(BTabilities(standardBT)))
+head(abilities)
+```
+
+Task 4: 
+What is the estimated probability that Air Force beats Alaska? How about Alaska beating Air
+Force? Alaska versus Alaska Anchorage? Recall that we can estimate these probabilities as abilityi/(abilityi +
+abilityj ).
+
+
+```{r}
+(0.243188/(0.243188+1.979963))
+(1.979963/(1.979963+0.243188))
+(1.979963/(1.979963+1))
+```
+
+## The estimated probability that Air Force beats Alaska is 10.94%. As for Alaska beating Air Force, it would be the inverse of the probability distribution from the previous scenario at 89.06%. The probability that Alaska will beat Alaska Anchorage is 66.44%. 
+
+Task 5:
+Use the “arrange” function from the “tidyverse” package to sort the teams by “ability”. Which three
+teams had the highest ratings? Use the Internet to determine how these teams did in the 2010 NCAA Men’s
+hockey postseason tournament. How did they do?
+
+```{r}
+abilities = abilities %>%
+  arrange(desc(ability))
+head(abilities,10)
+```
+
+## While all three of these teams made it to the tournament, none of them reach the final round. The Denver Pioneers were the first of the three to be eliminate in the tournament in the first round against the Rochester Tech (RIT) Tigers. Both the Miami RedHawks and the Wisconsin Badgers reached the "Frozen Four" semi-finals, but both were elimated by their respective opposing teams. So, despite Denver's team having a higher ability than Miami and Wisconsin, Denver actually performed worse in the tournament than the other two teams.
+
+Task 6:
+We can incorporate home ice advantage in the Bradley-Terry model to determine the value of playing
+at home (playing at home tends to impart some advantage). The code below runs the Bradley-Terry model
+with home ice advantage included. Pay careful attention to how the data is structured and passed to the
+“BTm” function.
+
+```{r}
+homeBT = BTm(result,data.frame(team = visitor, home.ice = 0),
+data.frame(team = opponent, home.ice = home.ice),~ team + home.ice,
+id = "team", data = icehockey)
+```
+
+```{r}
+summary(homeBT)
+```
+
+## The small difference is that now there is a home.ice variable at the bottom of the model's summary.
+
+Task 7:
+The expression below shows the amount of “ability” imparted by playing at home. The “home.ice”
+coefficient is the 58th coefficient in the model hence the 58 in the code below.
+
+```{r}
+exp(homeBT$coefficients[58])
+```
+
+As you did in Task 4 (the answer here will be similar, but not identical), what is the probability that Air
+Force defeats Alaska in a game held at a neutral site (no home ice advantage)?
+
+```{r}
+#By subtracting home ice advantage from both teams
+#Air Force = 0.24328805
+#Alaska	=
+1.97996358-1.496155	
+```
+```{r}
+#Probability of Air Force beating Alaska, where Alaska has no home ice advantage.
+.24328805/(.24328805+0.4838086)
+```
+
+## The probability that Air Force beats Alaska at a game where Alaska has no home ice advantage is 33.46%.
+
+What if the game is played on Air Force’s home ice? Adjust Air Force’s ability by adding the amount of
+ability we calculated at the beginning of this task to account for home ice.
+
+```{r}
+#The probability fo Air Force beating Alaska, where Air Force has the home ice advantage.
+(.24328805+1.496155)/((.24328805+1.496155)+0.4838086)
+```
+
+## If played at Air Force's home stadium, Air Force has a 78.24% probability of beating Alaska.
+
