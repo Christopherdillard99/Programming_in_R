@@ -1,0 +1,186 @@
+---
+title: "Pythagorean Expectation"
+author: "Christopher Dillard"
+date: "2023-05-25"
+output: word_document
+---
+
+
+```{r}
+library(tidyverse)
+library(Lahman)
+library(esquisse)
+```
+
+```{r}
+baseball = Lahman::Teams
+```
+
+### Task 1:
+
+```{r}
+baseball = baseball %>%
+  filter(yearID >= 1995)
+#str(baseball)
+```
+
+There are 834 remaining rows in the data frame and 48 columns.
+
+### Task 2:
+
+```{r}
+baseball = baseball %>% mutate(Wpct = W/(W+L)) %>% mutate(ExpWpct = (R^2)/(R^2 + RA^2))
+```
+
+```{r}
+model1 = lm(Wpct ~ ExpWpct,baseball)
+summary(model1)
+```
+
+```{r}
+ggplot(baseball,aes(Wpct,ExpWpct))+
+  geom_point()+
+  geom_smooth(method="lm")
+```
+
+
+
+Win Percentage appears to be statistically significant in the model with a p-value that is extremely close to zero. Additionally, the R-squared is 0.8847, which is indicative of our model being a reliable measure of variance in the response/independent variable (win percentage). In other words, Expected Win Percentage is a strong predictor of Win Percentage.From the scatterplot, we can observe how consistent the shape of the slope is throughout the graph with not a lot a dispersion away from the regression line.
+
+### Task 3:
+
+We determine if an exponent value is optimal, by how small the mean error associated with that value is.
+
+```{r}
+baseball = baseball %>%
+  mutate(error= Wpct - ExpWpct,sqerror= error^2)
+  
+```
+
+```{r}
+team_most_pos <- baseball %>%
+  filter(error == max(error))
+team_most_neg <- baseball %>%
+  filter(error == min(error))
+team_most_pos
+team_most_neg
+```
+
+```{r}
+closest_error_value = baseball$error[which.min(abs(baseball$error - 0))]
+closest_error_value
+closest_error_team = which.min(abs(baseball$error-0))
+closest_error_team
+
+print(baseball[537,])
+
+```
+
+
+The Seattle Mariners have the most positive error value at 0.0908, while the Oakland Athletics have the most negative error value at -0.0757. The team that has the error closest to zero is the Baltimore Orioles. Since the Baltimore Orioles had the smallest mean squared error, we can say that they performed the closest to their expected values. A postive error means that predictions surpassed actual results, while a negative error means that actual results were greated than the predicted values.
+
+### Task 4:
+
+```{r}
+x=2
+baseball = baseball %>% mutate(ExpWpctOpt = (R^x)/(R^x+RA^x))
+```
+
+```{r}
+baseball %>%
+  summarize(MSE= mean(sqerror),n=n())
+```
+
+
+
+```{r}
+baseball = baseball %>% mutate(errorOpt = Wpct-ExpWpctOpt,sqerrorOpt=errorOpt^2)
+x = 1.5
+baseball = baseball %>% mutate(ExpWpctOpt = (R^x)/(R^x+RA^x))
+baseball %>%
+  summarize(MSEopt= mean(sqerrorOpt),n=n())
+baseball = baseball %>% mutate(errorOpt = Wpct-ExpWpctOpt,sqerrorOpt=errorOpt^2)
+x = 1.6
+baseball = baseball %>% mutate(ExpWpctOpt = (R^x)/(R^x+RA^x))
+baseball %>%
+  summarize(MSEopt= mean(sqerrorOpt),n=n())
+baseball = baseball %>% mutate(errorOpt = Wpct-ExpWpctOpt,sqerrorOpt=errorOpt^2)
+x = 1.7
+baseball = baseball %>% mutate(ExpWpctOpt = (R^x)/(R^x+RA^x))
+baseball %>%
+  summarize(MSEopt= mean(sqerrorOpt),n=n())
+
+```
+
+The MSE value associated with a Pythagorean Expectation exponent of 2 is 0.0006697162.
+
+This value is clearly very small, but what value for x would yield a smaller mean squared error?
+
+```{r}
+baseball = baseball %>% mutate(errorOpt = Wpct-ExpWpctOpt,sqerrorOpt=errorOpt^2)
+x = 1.8
+baseball = baseball %>% mutate(ExpWpctOpt = (R^x)/(R^x+RA^x))
+baseball %>%
+  summarize(MSEopt= mean(sqerrorOpt),n=n())
+baseball = baseball %>% mutate(errorOpt = Wpct-ExpWpctOpt,sqerrorOpt=errorOpt^2)
+x = 1.9
+baseball = baseball %>% mutate(ExpWpctOpt = (R^x)/(R^x+RA^x))
+baseball %>%
+  summarize(MSEopt= mean(sqerrorOpt),n=n())
+baseball = baseball %>% mutate(errorOpt = Wpct-ExpWpctOpt,sqerrorOpt=errorOpt^2)
+x = 2.1
+baseball = baseball %>% mutate(ExpWpctOpt = (R^x)/(R^x+RA^x))
+baseball %>%
+  summarize(MSEopt= mean(sqerrorOpt),n=n())
+baseball = baseball %>% mutate(errorOpt = Wpct-ExpWpctOpt,sqerrorOpt=errorOpt^2)
+x = 2.2
+baseball = baseball %>% mutate(ExpWpctOpt = (R^x)/(R^x+RA^x))
+baseball %>%
+  summarize(MSEopt= mean(sqerrorOpt),n=n())
+baseball = baseball %>% mutate(errorOpt = Wpct-ExpWpctOpt,sqerrorOpt=errorOpt^2)
+x = 2.3
+baseball = baseball %>% mutate(ExpWpctOpt = (R^x)/(R^x+RA^x))
+baseball %>%
+  summarize(MSEopt= mean(sqerrorOpt),n=n())
+baseball = baseball %>% mutate(errorOpt = Wpct-ExpWpctOpt,sqerrorOpt=errorOpt^2)
+x = 2.4
+baseball = baseball %>% mutate(ExpWpctOpt = (R^x)/(R^x+RA^x))
+baseball %>%
+  summarize(MSEopt= mean(sqerrorOpt),n=n())
+baseball = baseball %>% mutate(errorOpt = Wpct-ExpWpctOpt,sqerrorOpt=errorOpt^2)
+x = 2.5
+baseball = baseball %>% mutate(ExpWpctOpt = (R^x)/(R^x+RA^x))
+baseball %>%
+  summarize(MSEopt= mean(sqerrorOpt),n=n())
+baseball = baseball %>% mutate(errorOpt = Wpct-ExpWpctOpt,sqerrorOpt=errorOpt^2)
+x = 2.6
+baseball = baseball %>% mutate(ExpWpctOpt = (R^x)/(R^x+RA^x))
+baseball %>%
+  summarize(MSEopt= mean(sqerrorOpt),n=n())
+baseball = baseball %>% mutate(errorOpt = Wpct-ExpWpctOpt,sqerrorOpt=errorOpt^2)
+x = 2.7
+baseball = baseball %>% mutate(ExpWpctOpt = (R^x)/(R^x+RA^x))
+baseball %>%
+  summarize(MSEopt= mean(sqerrorOpt),n=n())
+baseball = baseball %>% mutate(errorOpt = Wpct-ExpWpctOpt,sqerrorOpt=errorOpt^2)
+x = 2.8
+baseball = baseball %>% mutate(ExpWpctOpt = (R^x)/(R^x+RA^x))
+baseball %>%
+  summarize(MSEopt= mean(sqerrorOpt),n=n())
+```
+
+
+```{r}
+df <- data.frame(x_values = c(1.5,1.6,1.7,1.8,1.9,2,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8), y_values = c(0.000662,0.0007932,0.000713,0.00119664,0.0006378176,0.0006697162,0.0006405051,0.0007249827,0.0008058183,0.0009117201,0.001042171,0.00119664,0.001374587,0.00157546))
+ggplot(df, aes(x_values, y_values)) +
+  geom_point() +
+  geom_text(aes(label=y_values),hjust=0,vjust=1,angle=45,size=3)+
+  coord_cartesian(ylim = c(0, max(df$y) * 1.2))+
+  labs(x = "X Values", y = "MSEopt", title = "MSEopt After Altering the Exponent")
+```
+
+
+As shown by the graph, the exponent of 1.9 yields the smallest (best) MSE value of 0.000638, if we were to evaluate the exponents in increments of 0.1 from 1.5 to 2.8. 
+
+
+
