@@ -1,0 +1,129 @@
+---
+title: "Mod3 Assign1 Four Factors"
+author: "Christopher Dillard"
+date: "2023-06-01"
+output: word_document
+---
+
+For this assignment we will use “Four Factors” data from the 2018/2019 NBA season. The data for this
+assignment comes from Basketball Reference (https://www.basketball-reference.com/leagues/NBA_ 2019.ht
+ml#all_misc_stats).
+
+```{r, echo= FALSE, message=FALSE, warning=FALSE, error=FALSE}
+library(tidyverse)
+library(tidymodels)
+library(readr)
+Basketball = read_csv("BasketballRefFourFactors.csv")
+
+```
+
+Task 1 Read-in the “BasketballRefFourFactors.csv” file (available on the assignment page on Canvas). Use a
+filter to exclude the “League Average” row in the Team column. Describe the dataset.
+
+```{r}
+Basketball = Basketball %>%
+  filter(Team != "League Average")
+```
+
+
+```{r}
+#str(Basketball)
+```
+
+There are 30 rows and 28 variables in this dataset. "Team" and "Arena" contain character data while the rest of the variable contain numerical data. There are several instances of negative values, as well as decimals (some denoting ratios). This is a rich data-set in terms of variables that lends itself well to statistical analysis, even if there are only 30 teams.
+
+
+Task 2 Use the “ggcorrplot” function (you will need the “ggcorrplot” package) to examine the correlation be-
+tween the eight Four Factors variables (OeFGPct,OTOVPct,ORBPct,OFT/FGA,DeFGPct,DTOVPct,DRBPct,DFT/FGA)
+(note that backticks are necessary in the OFT/FGA and DFT/FGA because of the / symbol).
+There is a belief that the Four Factors are largely NOT correlated. Does this appear to be
+true? Comment on the correlations. The “ggcorrplot” function is described in detail online here:
+http://www.sthda.com/english/wiki/ggcorrplot-visualization-of-a-correlation-matrix-using-ggplot2.
+
+```{r}
+library(ggcorrplot)
+ggcorrplot(cor(subset(Basketball, select = c(`OeFGPct`, `OTOVPct`, `ORBPct`, `OFT/FGA`, `DeFGPct`, `DTOVPct`, `DRBPct`, `DFT/FGA`))), 
+           hc.order = TRUE, type = "lower", lab = TRUE)
+```
+
+The four factors appear to have a generally weak correlation between eachother. The 5 strongest correlations, increasingly, are DRBPct & DTOVPct (-.41), DRBPct & DFT/FGA (-.48), DRBPct & DeFGPct (-.51), OTOVPct & DFT/FGA (.54), and OeFGPct & DeFGPct (-.57). One observation that could be useful is how the defense-related factors had higher, and generally negative, correlations with eachother when compared to the correlations between offensive factors. The 2 stronest correlations were between OTOVpct & DFT/FGA, which yielded a positive value of 0.54, and OeFGPct & DeFGPct, yielding a negative correlation of -0.57. This latter (and strongest negative correlation) is pretty intuitive since a high OeFGPct is a good thing, while a high DeFGPct is NOT. Ideally, teams should strive for a high OeFGPct (ability to score points on offense) and a low DeFGPct (points scored against them while on defense). 
+
+
+
+Task 3 Repeat Task 2, but examine the correlation between the Four Factors (really eight, four for offense
+and four for defense), Wins (given as W in the dataset), and average Margin of Victory (given as MOV).
+Describe how the Four Factors are or are not correlated with Wins average Margin of Victory. Which factors
+appear to be the most important?
+
+
+```{r}
+ggcorrplot(cor(subset(Basketball, select = c(`OeFGPct`, `OTOVPct`, `ORBPct`, `OFT/FGA`, `DeFGPct`, `DTOVPct`, `DRBPct`, `DFT/FGA`,`W`,`MOV`))), 
+           hc.order = TRUE, type = "lower", lab = TRUE)
+```
+
+DeFGPct has the largest negative correlation of -0.8 with Margin of Victory. Since a higher DeFGPct means that the team allowed to other team to score more against them, this negative correlation makes since. The highest postive correlation with MOV is OeFGPct at 0.79. This is fairly easy to understand since it measures a team shooting efficiency (ie. their ability to score points). DTOVPct has zero correlation to MOV, which I found to be surprising given that OTOVPct has a not-too-weak negative correlation on Wins and Margin of Victory at -0.31 for both. In short, DTOVPct is team A's ability disrupt team B's offense, forcing a turnover in team A's favor, but this graph suggest that is does not have any impact of wins.  
+
+
+Task 4 Plot each of the factors (all eight of them) versus W. Choose an appropriate chart type. I strongly
+recommend that you use the “grid.arrange” function from the “gridExtra” package (you’ll need to install
+this package) to succintly arrange your eight plots. An example use of the “grid.arrange” function is shown
+here: https://cran.r-project.org/web/packages/egg/vignettes/Ecosystem.html. You can plot them all in one
+big grid or two separate grids of four plots (one grid for offense factors, one for defense). Comment on the
+relationships you see between each of the factors and Wins.
+
+```{r}
+library(gridExtra)
+p1 <- qplot(OeFGPct, W, color= W, data = Basketball)
+p2 <- qplot(x= OTOVPct, y= W, color= W, data = Basketball)
+p3 <- qplot(ORBPct, W, color= W, data = Basketball)
+p4 <- qplot(`OFT/FGA`, W, color= W, data = Basketball)
+p5 <- qplot(DeFGPct, W, color = W, data = Basketball)
+p6 <- qplot(DTOVPct, W, color= W, data = Basketball)
+p7 <- qplot(DRBPct, W, color= W, data = Basketball)
+p8 <- qplot(`DFT/FGA`, W, color= W, data = Basketball)
+grid.arrange(p1, p2, p3, p4, nrow = 2)
+grid.arrange(p5, p6, p7, p8, nrow = 2)
+```
+
+The clearest relationship between variable and wins are OeFGPct and DeFGPct. As discussed earlier, this makes perfect sense given that a  OeFGPct shows that the team made more points and a higher DeFGPct would indicate that more points were made against them. DRBPct, or the team ability to secure defense rebound and thus prevent the other team from scoring by regaining possession of the ball, also appears to have a positive relationship with Wins. So, if the team can retake possession of the ball and prevent the otehr team from scoring, they have a better chance at winning and of course the opportunity to score with the ball in their possession again. OTOVpct is harder to make a claim by just visually looking at the graph compared to the previously mentioned statistics, but it absolutely can influence the number of wins with a negative relationship. OTOVPct, or the Offensive Turnover Percentage, measures how well the team is at maintaining control of the ball and preventing turnovers while attempting to score against the other team. Essentially, a higher OTOVPct shows a higher turnover rate against the team which would put the ball in the other teams possession and lower the chances of winning.  
+
+
+Task 5 Build a linear regression model to predict wins with the eight Four Factors. The code to build a
+linear regression model with multiple predictor (x) variables is shown below:
+model1 = lm(W ~ OeFGPct+OTOVPct+ORBPct+`OFT/FGA`+DeFGPct+DTOVPct+DRBPct+`DFT/FGA`,fourfactors)
+The next block of code presents a summary of the model:
+summary(model1)
+
+
+```{r}
+model1 = lm(W ~ OeFGPct+OTOVPct+ORBPct+`OFT/FGA`+DeFGPct+DTOVPct+DRBPct+`DFT/FGA`,Basketball)
+summary(model1)
+```
+
+Let’s interpret this summary. Start by looking at the regression coefficients (slopes) associated with each
+of the eight predictor variables. These are shown in the “Estimate” column. We are primarily concerned
+about the direction (sign) of each slope. A positive slope implies that as the variable increases, we would
+see a corresponding increase in the response variable (Wins). A negative slope implies that as the variable
+increases, we would see a corresponding decrease in the response variable. Which variables have positive
+contributions to Wins? Which have negative contributions?
+
+OeFGPct, ORBPct, OFT/FGA, DTOVPct, DTOVPct, DRBPct, and DFT/FGA all have positive contributions to wins. OTOVPct and DeFGPct are the only predictor variables that have negative contributions to wins in our model.
+
+We can examine the p-value associated with each slope coefficient. If the p-value (shown in the Pr(>|t|)
+column) is less than 0.05 (be careful to notice scientific notation) then we say that the variable is a significant
+predictor of Wins. Which variables are significant? Which are not?
+
+The p-value is extremely small for several variables in this model and generally show significance, except for DFT/FGA where the p-value is around 0.92. Variable that are significant but to less of degree than the extremely small p-values would be DTOVPct, OFT/FGA, DRBPct, in that order. 
+
+Finally, we look at the Adjusted R-squared value. A value close 1 implies that the model does a good job at
+explaining the variance in the Wins variables. Is this model good in that regard?
+
+The Adjusted R-Squared value is 0.9403. This implies that the model does a very good job at explaining the variance in the wins variables, leaving only around 6% of the variance unexplained. 
+
+Task 6 Dean Oliver, the author “Basketball on Paper” and the creator of the Four Factors concept, suggests
+that winning a game is 40% Shooting, 25% Turnovers, 20% Rebounding, and 15% Free Throw Rate. Based
+upon your analysis in this assignment, do you agree with his assessment? If so, why? If not, why not?
+
+
+After looking at all of the analyses produced in this assignment, I would mostly agree with Dean Oliver in this claim. This is supported by looking at the positive contributions of the variables AND their levels of significance in our model from task 5. OeFGPct measures the shooting efficiency of the team and is by far the most significant variable in our model. Our second most significant (in terms of p-values), positive contribution on the number of wins is ORBPct (measuring successful rebounds). In this model, turnovers (DTOVPct) actually come after rebounds when looking at p-values. That being said, the estimate was larger for for turnover. So, more data could be useful to dispute his claim since p-values are just indicative of the evidence in our model, which could certainly change if we had 60 teams instead of just 30. Freethrows, depicted by OFT/FGA had a much larger estimate than the rebounds and turnovers (which is understandable since freethrows directly add points), yet it p-value was higher, thus less significant. In other words, shooting and free throws are the only way to directly raise a teams score, with shooting even more so. Turnovers and Rebounds give the team the opportunity to make shots, as well as prevent the other team from making shots by maintaing possession of the ball.
+
