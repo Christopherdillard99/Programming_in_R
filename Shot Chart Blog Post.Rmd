@@ -1,0 +1,147 @@
+---
+title: 'Shot Charts: Blog Post'
+author: "Christopher Dillard"
+date: "2023-06-06"
+output: word_document
+---
+
+```{r,include=FALSE}
+options(warn=-1)
+```
+
+```{r, include=FALSE, message=FALSE}
+library(tidyverse)
+library(devtools)
+devtools::install_github("abresler/nbastatR")
+library(nbastatR)
+```
+```{r, include=FALSE, message=FALSE}
+Sys.setenv("VROOM_CONNECTION_SIZE" = 131072 * 2)
+shots = teams_shots(teams = c("Los Angeles Lakers","Portland"), seasons = 2019)
+```
+
+```{r, include=FALSE, message=FALSE}
+source("https://raw.githubusercontent.com/stephenhillphd/ballr/master/plot_court.R")
+source("https://raw.githubusercontent.com/stephenhillphd/ballr/master/court_themes.R")
+plot_court()
+court_points = court_points %>% mutate_if(is.numeric,~.*10)
+```
+
+```{r, include=FALSE, message=FALSE}
+ggplot(shots,aes(x=locationX,y=locationY+45)) +
+geom_point() +
+coord_equal() +
+geom_path(data = court_points,
+aes(x = x, y = y, group = desc),
+color = "black") +
+xlim(-250,250) + ylim(0,400) + theme_minimal()
+```
+
+
+```{r, include=FALSE, message=FALSE}
+ggplot(shots,aes(x=locationX,y=locationY+45)) +
+stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
+scale_fill_distiller(palette=4, direction=-1) +
+coord_equal() +
+geom_path(data = court_points,
+aes(x = x, y = y, group = desc),
+color = "black") +
+xlim(-250,250) +
+ylim(0,400) +
+labs(x = "x coordinate", y = "y coordinate") +
+theme_minimal() +
+theme(legend.position = "none")
+```
+
+## What is a Shot Chart?
+
+Shot Charts are great ways to visualize where shots are being taken. This way of using data helps with formulating effective defense strategies when looking at where opposing teams tend to shoot from, as well as help teams strengthen their own offense by measuring how often shots are made from specific spots on the courts. The data measures proximity to the basket, by centering the basket on the x-axis and giving shots attempted from the left of the basket postive x values and those from the right, negative ones. Similarly, the further a player shoots from the baseline (the x-axis on the Shot Chart), the higher the y value will be.     
+
+## Exploring Shot Charts with Four Teams
+
+
+```{r, include=FALSE}
+suppressWarnings({
+  four_teams = teams_shots(teams = c("Los Angeles Lakers","Portland","Houston","Golden State Warriors"), seasons = 2019)
+four_teams = four_teams %>% filter(zoneRange != "Less Than 8 ft.")
+})
+```
+
+```{r, echo=FALSE}
+suppressWarnings({
+ggplot(four_teams,aes(x=locationX,y=locationY+45)) +
+stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
+scale_fill_distiller(palette=4, direction=-1) +
+coord_equal() +
+geom_path(data = court_points,
+aes(x = x, y = y, group = desc),
+color = "black") +
+xlim(-250,250) +
+ylim(0,400) +
+  labs(x="",y="",title="Team Shot Charts")+
+  facet_wrap(~nameTeam, ncol=2)
+})
+```
+
+These charts reveal some commonalities between shooting patterns across teams, chiefly in terms of the number of shots attempted around the three-point line. In the case of the Houston Rockets, shots are generally limited to the three-point line with some light clustering just below the free-throw line. All other team show a much higher degree of spread away from the three-point line, with the Golden State Warriors having a lot more shots attempted within the key (free throw lane), as well as within the perimeter (ie. the area between the key and the three-point lane), when compared to the other three teams. These charts could suggest that the Los Angeles Lakers and the Houston Rockets prefer to shoot from the three-point line and, therefore, defensive strategies when playing against them should address that by attempting to block those kinds of shots. On the other hand, the Portland Trail Blazers and the Golden State Warriors might need opponents to focus much more on blocking their entry into the perimeter and key, in addition to blocking these teams from passing to players within these areas. That being said, these graph do not reveal shooting efficiency, so any assessments on where these teams tend to make shots and where they need improvements would require further analysis.
+
+
+## Comparing Shot Charts for Players
+
+```{r, include=FALSE}
+suppressWarnings({
+  Player_shots = four_teams %>% filter(namePlayer == c("LeBron James","Stephen Curry","Damian Lillard","James Harden"))
+  Player_shots = Player_shots %>% filter(zoneRange != "Less Than 8 ft.")
+})
+```
+
+```{r, echo=FALSE}
+suppressWarnings({
+ggplot(Player_shots,aes(x=locationX,y=locationY+45)) +
+stat_density_2d(aes(fill = ..density..), geom = "raster", contour = FALSE) +
+coord_equal() +
+geom_path(data = court_points,
+aes(x = x, y = y, group = desc),
+color = "black") +
+xlim(-250,250) + ylim(0,400) +
+  labs(x="",y="",title = "Player Shot Charts",fill="Shot Density")+
+  facet_wrap(~namePlayer, ncol=2)
+})
+```
+
+These shot charts provide insight into where on the court players shoot from. The position can tell us a number of things like handedness, by the what angles a player shoots from and distribution of the shots shown be density in the players' graphs.
+
+Exploring handedness as a factor of shot locations can make for some interesting observations for all four players. It appears that most of their shots are coming from slightly behind the three-point line; but, the biggest differences come from exactly *where* along this line are the shots being taken. In Lebron James case, there appears to be more shots coming from the right of the basket (ie. negative x-values on the graph). This observation is similar to Damian Lillard's shot graph, as both shooters shoot right-handed. In reality, however, LeBron James writes left-handed but is dominant with his right handed when playing basketball, hence why such a large share of his shots are coming from the right side of the three-point line. James Harden is one case where a lefty actually shoots left-handed, which is made evident by the much higher density of shots from the left side of the basket (ie. positive x values). So, then why doesn't Steph Curry's chart follow a similar pattern if he is naturally right-handed? In fact, he not only appears to have an equal distribution of shots from the left and right of the basket, but also seems to be the player with the highest density of shots closest to the corners (closer to x-axis on the graph). Shots from this position are much harder since they don't allow for the ball to hit the backboard, and without a steady hand to guide the ball, the trajectory could go right out of bounds and into the other team's possession. So, for Steph Curry to shoot from all around the three-point line, on both sides and even at the trickiest angles, reflects some pretty "ballsy" skills.
+
+
+## Measuring Results of Shots (Made vs. Missed)
+
+```{r, echo=FALSE}
+suppressWarnings({
+ggplot(Player_shots, aes(x = locationX, y = locationY+45, color = typeEvent)) +
+  geom_point(size = 1) +
+  scale_color_manual(values = c("green", "red")) +
+  geom_path(data = court_points,
+aes(x = x, y = y, group = desc),
+color = "black") +
+  xlim(-250,250) + ylim(0,400) +
+  facet_wrap(~namePlayer)+ theme_minimal() +
+  labs(x="",y="",title = "Made vs. Missed Shots by Player",  color="Shot Outcome")
+})
+```
+
+
+Unlike the other graphs shown before, these four graphs tell a less compelling story given how the spread of "made" and "missed" shots cover the same areas on the court, with no specific area that can be confidently identified as a successful-shot hotspot. These graphs each represent shot stats for a few of the top names in the NBA, but also reveal that even the very best have missed much more than a couple shots throughout their careers. One thing's for sure here that can be summed up perfectly in the words of Wayne Gretzky: "you miss 100% of the shots you don't take."
+
+# More Ways to Explore Shot Charts:
+
+[Interactive LeBron Career Shot Maps](https://www.statmuse.com/nba/ask/lebron-james-career-shot-chart-by-season)
+
+[Creating Your Own Shot Maps in R](https://www.owenlhjphillips.com/new-blog/2020/6/25/how-to-make-nba-shots-charts-in-r)
+
+[More Ways to Interpret Shot Maps](https://benchboss.ai/how-to-read-a-shot-chart/)
+
+
+```{r,include=FALSE}
+options(warn=-1)
+```
