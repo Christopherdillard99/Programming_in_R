@@ -1,0 +1,160 @@
+---
+title: "WAR! What is it good for... in Baseball?"
+author: "Christopher Dillard"
+format: html
+editor: visual
+---
+
+```{r,include=FALSE}
+library(readr)
+library(tidyverse)
+library(esquisse)
+library(magick)
+fangraphs <- read_csv("fangraphs-1.csv")
+```
+
+```{r,include=FALSE}
+str(fangraphs)
+summary(fangraphs)
+```
+
+[![Photocredit: Jake Roth, USA TODAY Sports](635791636514647984-sw21-hurts-0417.png){fig-align="left"}](https://www.usatoday.com/story/sports/mlb/2013/04/12/dodgers-livid-after-greinke-hurt-in-brawl/2079207/)
+
+## What is WAR?
+
+Contrary to what some of you might have heard in the 70s, WAR might be good for a lot of things... that is, if you ask a sabermetrician. Wins Above Replacement (WAR) is a statistic used in Baseball to gather a better image of a player's contribution to the overall team's performance, in terms of their defensive position- either pitcher or a position player (infielder, outfielder, or catcher).
+
+**Why is it used?**
+
+WAR is used to measure a player's value in terms of how many more wins they are worth compared to their "replacement" or, otherwise, another player in the same position. So, the higher the WAR, the more valuable a player is to the team. Values generally fall between 0-6, with any values above 6 being considered MVP status.
+
+**How is it calculated?**
+
+There are two formulas used to calculate this value, which furthermore rely on other calculations to gain a more holistic view of the player's value.
+
+For **position players** you would use the following formula:
+
+-   WAR = (Batting Runs + Base Running Runs +Fielding Runs + Positional Adjustment + League Adjustment +Replacement Runs) / (Runs Per Win)
+
+The great thing about this formula is how it takes on additional components to compensate for differences in stadium and league conditions. This way, we can isolate the performance of players by narrowing the formula inputs to those that don't rely on luck or are within the player's control.
+
+For **pitchers**, the formula is a little more complicated:
+
+-   WAR = \[\[(\[(League "FIP" -- "FIP") / Pitcher Specific Runs Per Win\] + Replacement Level) \* (IP/9)\] \* Leverage Multiplier for Relievers\] + League Correction.
+
+The difference here is in how the pitcher's individual skills are treated as the main contributing factor to wins. In the WAR formula, FIP (Fielding Independent Pitching) is subtracted from the League FIP. FIP is a metric used to measure a pitcher's value based solely on conditions where they have the most control. For example, two pitchers could have the exact same skillset and pitch identically to the same hitter, but the pitcher for the team with a better overall defense will "allow" fewer hits and therefore less runs against them. Unlike a WAR value, FIP values are ideally kept lower, with anything below 3 considered highly valuable, while values above 4 are below-average for pitchers. This inverse relationship between the two metrics can be captured with the following graph:
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+ ggplot(fangraphs) +
+  aes(x = FIP, y = WAR) +
+  geom_point(shape = "circle", size = 1.5, colour = "#416FC1") +
+  labs(x = "FIP", y = "WAR", title = "WAR vs. FIP",subtitle="The Inverse Relationship Between 2 Key Pitcher Metrics") +
+  theme_minimal()+
+  geom_smooth(method="lm",color = "#94B7E6")
+  
+
+```
+
+As we can see, there is a fairly linear, negative relationship between WAR and FIP. The graph above contains real pitcher data gathered from a pool of 61 pitchers across 27 different teams. As FIP goes up, WAR goes down, and vise versa.
+
+These next 3 graphs measure the number of games played with the number of wins. The size and darkness of each data point corresponds to each player's WAR value to test whether WAR is more affected by wins or losses.
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+suppressMessages({
+   ggplot(fangraphs) +
+    aes(x = WAR, y = W) +
+    geom_point(shape = "circle",size=3) +
+    labs(y = "Wins") +
+    scale_color_gradient() +
+    theme_minimal() +
+    ggtitle("Wins vs. WAR") +
+    geom_smooth(aes(group = 1), method = "lm")
+})
+
+
+
+
+suppressMessages({
+ ggplot(fangraphs) +
+    aes(x = WAR, y = L) +
+    geom_point(shape = "circle", size=3) +
+    labs(y = "Losses") +
+    scale_color_gradient() +
+    theme_minimal() +
+    ggtitle("Losses vs WAR") +
+    geom_smooth(aes(group = 1), method = "lm")
+})
+
+
+
+suppressMessages({
+  ggplot(fangraphs) +
+    aes(x = WAR, y = G, color = W) +
+    geom_point(shape = "circle", size= 3) +
+    labs(y = "Games Played", color = "Wins") +
+    scale_color_gradient() +
+    theme_minimal() +
+    ggtitle("Games Played vs. WAR") +
+    geom_smooth(aes(group = 1), method = "lm")
+})
+
+
+
+```
+
+As we can see from these two graphs, when we plot wins against WAR, there is a positive relationship between the two. Obviously. In the second graph, as should be expected, a higher number of losses results in a lower WAR value.
+
+What is worth noticing, however, is that there doesn't appear to be any correlation between the number of games played and WAR value. So, although players with better track records... err *pitch* records should certainly play more games, this particular data set does not reflect that. In particular, the one lonely player with a WAR of 6.5, Max Scherzer, only pitched in 27 games, while all the other pitchers with WARs above 6 have all pitched in at least 32 games. **Could it be skill, luck, or a lack of data?**
+
+**Just how much of an impact does a pitcher's performance have on their WAR?**
+
+```{r, echo=FALSE}
+library(GGally)
+fangraphs_ggcorr = fangraphs %>%
+  select(W,L,SV,G,IP,BABIP,FIP,ERA,WAR)
+ ggcorr(fangraphs_ggcorr, label = "TRUE", label_round = 2) +
+  labs(title = "Correlation Matrix Between A Few Metrics & WAR")
+```
+
+To the untrained eye, this graph may come off as a bit confusing, but bear with me here. At the Top of the Correlation Matrix Heatmap is our familiar friend, WAR. The values in the column immediately below it tell us the correlation between WAR and some of the other pitcher statistics that factor into how its calculated, being: ERA (Earned Run Average), FIP (Fielding Independent Pitching), BABIP (Batting Average on Balls in Play), IP (Innings Pitched), G (Games Played), SV (Saves), L (Losses), W (Wins). This column is the most important in this particular plot since it measures the impact of each metric on a player's WAR by looking at the correlation's distance from zero. Positive correlations (color-coded in red) imply that pitchers with higher values for the corresponding metric on the left would have a higher WAR. On the other hand are the negative correlations in blue, where the more negative the value is, the worse of an impact the metric would have on a player's WAR.
+
+Let's simplify this a bit more and look only at the top two most impactful stats for WAR in the dataset: Fielding Independent Pitching (FIP), which we saw before, and Earned Run Average (ERA).
+
+```{r,echo= FALSE}
+
+fangraph_newgraph2 = fangraphs
+#esquisser()
+ ggplot(fangraph_newgraph2) +
+  aes(x = WAR, y = ERA, size = FIP) +
+  geom_point(shape = "circle", color = "#112446") +
+  labs(title = "Taking a look at ERA and FIP Relative to WAR") +
+  theme_minimal()
+  
+```
+
+If you recall from our Correlation Matrix, FIP had the highest (negative) impact on a pitcher's WAR. Looking at the graph above, this is made evident by just how concentrated the bigger points (for bigger FIPs) are on the left side of the graph than on the right. ERA ranked second-most-detrimental, which explains how, although the ERAs are certainly decreasing as WAR gets higher, this descent is not perfectly linear.
+
+On the positive side, Innings Pitched (IP) had the third strongest correlation at 0.59, showing that it's the most significant factor in raising a pitcher's WAR. The number of innings pitched is important in showcasing a pitcher's value because it's their way of limiting the other team's runs and, thus, not giving the other team an easy opportunity to score against them.
+
+**Is** **WAR alone a good statistic when measuring pitcher value?**
+
+We should keep in mind that WAR is just an estimate and should be used in conjunction with other metrics to fully assess a player's value to the team and take into account how these values may change over time.
+
+One noteworthy criticism of WAR is how it might be used to compare current players to those who were around in the earlier years of baseball, particularly given how there was much more variance in skills in the late 1800s/early 1900s which can easily inflate the values of the best players from those eras. Given how many variations of the WAR formula there are and the potential issues when comparing WAR values across multiple eras, will this statistic remain relevant in the years ahead or should we expect more accurate formulas?
+
+Although several questions remain and it may not be perfect, we do have one answer to the age-old question: what is WAR good for? Absolutely a LOT in the MBA!
+
+```{r, include=FALSE}
+team_count = fangraphs %>% 
+  distinct(Team) %>% 
+  summarize(count = n_distinct(Team))
+print(team_count$count)
+```
+
+**Other Articles That May Pique Your Interest:**
+
+<https://marinersblog.mlblogs.com/a-lesson-in-war-position-player-216ecffcd465>
+
+<https://library.fangraphs.com/misc/war/>
+
+<https://library.fangraphs.com/pitching/fip/>
