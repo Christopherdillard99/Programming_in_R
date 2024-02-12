@@ -76,7 +76,7 @@ colSums(is.na(pbp_cleaned))
 
 There are 106 rows of missing data for the three variables related to seconds remaining, in addition to the "time" variable.
 
-Knowing the play type is crucial to understand the winning chance at a specific play, so with only 51 rows of missing data for the play_type, I cant complete row wise deletion here with losing too much data. 
+Knowing the play type is crucial to understand the winning chance at a specific play, so with only 51 rows of missing data for the play_type, I cant complete row wise deletion here without losing too much data. 
 
 Temp and Wind both have 124,494 instances of missing data, which has to do with the games played indoors. To make up for these missing values, we will have to take the typical values for both (indoor temp is usually 70-75 and wind speed would be 0) and impute these values.
 
